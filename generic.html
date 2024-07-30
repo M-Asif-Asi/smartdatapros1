@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Our Services - Smart Data Pros</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Open+Sans:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f4f8;
+            color: #333;
+        }
+        header {
+            background-color: #343a40;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+        header h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 1000;
+            margin: 0;
+            font-size: 5.5em;
+        }
+        header img {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 50px;
+            height: 50px;
+        }
+        .marquee {
+            background-color: #17a2b8;
+            color: white;
+            padding: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        .marquee p {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            line-height: 50px;
+            text-align: center;
+            transform: translateX(100%);
+            animation: marquee 15s linear infinite;
+        }
+        @keyframes marquee {
+            from {
+                transform: translateX(100%);
+            }
+            to {
+                transform: translateX(-100%);
+            }
+        }
+        .container {
+            width: 85%;
+            margin: 0 auto;
+            padding: 20px 0;
+        }
+        .services {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .service {
+            background-color: #C6F4D6;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            margin: 30px;
+            padding: 20px;
+            width: 20%;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            text-align: center;
+        }
+        .service:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+        .service i {
+            font-size: 60px;
+            color: #17a2b8;
+            margin-bottom: 15px;
+        }
+        .service h2 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            color: #343a40;
+            margin: 15px 0;
+        }
+        .service p {
+            font-size: 16px;
+            line-height: 1.7;
+            color: #555;
+        }
+        .popup {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #ff4444;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            animation: popup 5s ease-in-out infinite;
+        }
+        @keyframes popup {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        footer {
+            background-color: #343a40;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        footer p {
+            margin: 0;
+        }
+        @media (max-width: 768px) {
+            .service {
+                width: 90%;
+                margin: 20px auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+
+        <h1>Smart Data Pros</h1>
+        <img src="https://via.placeholder.com/50" alt="Logo"> <!-- Replace with your logo URL -->
+    </header>
+    <div class="marquee"><button onclick="location.href='index.html'" style="background-color: #17a2b8; color: white; padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">
+    <i class="fas fa-home"></i> Home
+</button>
+        <p>Our Services: Content Writing | Proposal Writing | Data Analysis | Data Scraping | Data Mining | Virtual Assistance</p>
+    </div>
+    <div class="container">
+        <h2 style="text-align: center; color: #17a2b8; font-family: 'Montserrat', sans-serif; font-weight: 700;">Our Services</h2>
+        <div class="services">
+            <div class="service">
+                <i class="fas fa-pencil-alt"></i> <!-- Content Writing Icon -->
+                <h2>Content Writing</h2>
+                <p>Professional content writing services for blogs, websites, and more. We help you communicate effectively with your audience.</p>
+            </div>
+            <div class="service">
+                <i class="fas fa-file-alt"></i> <!-- Proposal Writing Icon -->
+                <h2>Proposal Writing</h2>
+                <p>Expert proposal writing services to help you secure funding, partnerships, and business deals with compelling and persuasive documents.</p>
+            </div>
+            <div class="service">
+                <i class="fas fa-chart-line"></i> <!-- Data Analysis Icon -->
+                <h2>Data Analysis</h2>
+                <p>Data analysis services to help you make informed decisions based on data insights and trends.</p>
+            </div>
+            <div class="service">
+                <i class="fas fa-database"></i> <!-- Data Scraping Icon -->
+                <h2>Data Scraping</h2>
+                <p>Efficient data scraping solutions for your business needs, providing accurate and relevant data.</p>
+            </div>
+            <div class="service">
+                <i class="fas fa-search"></i> <!-- Data Mining Icon -->
+                <h2>Data Mining</h2>
+                <p>Uncover valuable insights and patterns in large datasets with our advanced data mining services.</p>
+            </div>
+            <div class="service">
+                <i class="fas fa-headset"></i> <!-- Virtual Assistance Icon -->
+                <h2>Virtual Assistance</h2>
+                <p>Reliable virtual assistant services to help you manage your tasks efficiently and save time.</p>
+            </div>
+    </div>
+    <footer>
+
+        </div>
+    </div>
+    </div>
+    <footer>
+        <p>&copy; 2024 Smart Data Pros | Contact us at masiflail716@gmail.com</p>
+    </footer>
+</body>
+</html>
