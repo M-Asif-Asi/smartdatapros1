@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Conversion - Smart Data Pros</title>
+    <style>
+        body {
+            font-family: 'Open Sans', sans-serif;
+            text-align: center;
+            background-color: #f0f4f8;
+        }
+        .upload-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            margin-top: 50px;
+        }
+        button {
+            background-color: #17a2b8;
+            color: white;
+            border: none;
+            padding: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF Conversion</h1>
+    <div class="upload-section">
+        <input type="file" id="pdfFile" accept=".pdf">
+        <button onclick="convertPDF()">Convert to Excel</button>
+        <button onclick="convertPDF()">Convert to Word</button>
+        <button onclick="convertPDF()">Convert to Image</button>
+    </div>
+
+    <script>
+        function convertPDF() {
+            alert("Conversion functionality will be implemented here.");
+            // Implement server-side logic to convert PDF using libraries like Python's pdf2image, pdfplumber, or Adobe API.
+        }
+    </script>
+</body>
+</html>
