@@ -5,91 +5,107 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CNIC Extractor with OCR</title>
 <style>
-/* ... your CSS stays mostly the same ... */
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea, #764ba2); padding:20px; }
-.container { max-width: 1000px; margin: 0 auto; background: white; border-radius: 15px; padding: 20px; }
-.header, .footer { text-align:center; color:white; background:#2c3e50; padding:20px; }
-.header h1 { font-size:2em; }
-.upload-section { border:3px dashed #3498db; padding:40px; text-align:center; margin-bottom:20px; }
-.file-label { cursor:pointer; background:#3498db; color:white; padding:10px 20px; border-radius:10px; }
+body { font-family:sans-serif; padding:20px; background:#f0f0f0; }
+.container { max-width:800px; margin:auto; background:white; padding:20px; border-radius:10px; }
+.upload-section { text-align:center; margin-bottom:20px; }
 .file-input { display:none; }
-.buttons { text-align:center; margin:20px 0; }
-.btn { padding:10px 20px; margin:0 5px; border:none; border-radius:10px; cursor:pointer; }
-.btn:disabled { background:#bdc3c7; cursor:not-allowed; }
-.btn-download { background:#27ae60; color:white; }
-.progress-bar { width:100%; height:20px; background:#ecf0f1; border-radius:10px; overflow:hidden; }
-.progress { height:100%; width:0%; background:linear-gradient(90deg,#3498db,#2ecc71); transition:width 0.3s; }
-.status { padding:10px; margin:10px 0; border-radius:5px; }
-.status.info { background:#d1ecf1; color:#0c5460; }
-.status.success { background:#d4edda; color:#155724; }
-.results { max-height:400px; overflow-y:auto; background:#f8f9fa; padding:15px; border-radius:10px; margin-top:20px; }
-.page-section { border-left:4px solid #3498db; margin:10px 0; padding:5px 10px; }
-.cnic-item { padding:5px; margin:3px 0; border-left:3px solid #27ae60; background:#fff; }
+.file-label { cursor:pointer; padding:10px 20px; background:#3498db; color:white; border-radius:5px; display:inline-block; }
+.buttons { text-align:center; margin:10px 0; }
+button { padding:10px 15px; margin:5px; cursor:pointer; }
+button:disabled { background:#ccc; cursor:not-allowed; }
+.progress-bar { width:100%; background:#eee; height:20px; border-radius:10px; overflow:hidden; margin:10px 0; }
+.progress { height:100%; width:0%; background:#3498db; transition:width 0.3s; }
+.status { margin:10px 0; padding:10px; border-radius:5px; background:#d1ecf1; color:#0c5460; }
+.results { max-height:400px; overflow:auto; background:#f8f8f8; padding:10px; border-radius:5px; display:none; }
+.page-section { border-left:4px solid #3498db; margin:10px 0; padding-left:10px; }
+.cnic-item { border-left:3px solid #27ae60; padding-left:5px; margin:3px 0; }
 </style>
 </head>
 <body>
 <div class="container">
-  <div class="header"><h1>📄 CNIC Extractor with OCR</h1></div>
+  <h2>📄 CNIC Extractor</h2>
 
   <div class="upload-section">
     <input type="file" id="pdfFile" class="file-input" accept=".pdf">
-    <label for="pdfFile" class="file-label">Choose PDF File</label>
+    <label for="pdfFile" class="file-label">Choose PDF</label>
     <div id="selectedFile"></div>
   </div>
 
   <div class="buttons">
-    <button id="extractBtn" class="btn" disabled>🔍 Extract CNICs</button>
-    <button id="downloadTxt" class="btn btn-download" disabled>📥 Download TXT</button>
-    <button id="downloadCsv" class="btn btn-download" disabled>📊 Download CSV</button>
+    <button id="extractBtn" disabled>🔍 Extract CNICs</button>
+    <button id="downloadTxt" disabled>📥 Download TXT</button>
+    <button id="downloadCsv" disabled>📊 Download CSV</button>
   </div>
 
   <div class="progress-bar"><div class="progress" id="progressBar"></div></div>
-  <div id="progressText">Ready to process</div>
-  <div id="status" class="status info">Please select a PDF file.</div>
+  <div id="progressText">Ready</div>
+  <div id="status" class="status">Select a PDF to start</div>
 
-  <div class="results" id="results" style="display:none;">
-    <h3>📋 Extracted CNIC Numbers</h3>
+  <div class="results" id="results">
+    <h3>Extracted CNICs</h3>
     <div id="resultsContent"></div>
   </div>
-
-  <div class="footer"><strong>Developed by Muhammad Asif</strong></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.469/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
 <script>
-let currentData = null;
+let currentData=null;
 
-function updateStatus(msg,type){ const s=document.getElementById('status'); s.textContent=msg; s.className=`status ${type}`; }
-function resetUI(){ document.getElementById('progressBar').style.width='0%'; document.getElementById('progressText').textContent='Ready'; document.getElementById('results').style.display='none'; document.getElementById('resultsContent').innerHTML=''; document.getElementById('downloadTxt').disabled=true; document.getElementById('downloadCsv').disabled=true; }
-
-const pdfInput=document.getElementById('pdfFile');
-pdfInput.addEventListener('change', e=>{
+// File selection
+document.getElementById('pdfFile').addEventListener('change', e=>{
   const file=e.target.files[0];
-  if(file){ document.getElementById('selectedFile').textContent=`Selected: ${file.name}`; document.getElementById('extractBtn').disabled=false; resetUI(); } else { document.getElementById('selectedFile').textContent=''; updateStatus('Select a PDF file','info'); document.getElementById('extractBtn').disabled=true; }
+  if(file){
+    document.getElementById('selectedFile').textContent=`Selected: ${file.name}`;
+    document.getElementById('extractBtn').disabled=false;
+    resetUI();
+  } else {
+    document.getElementById('selectedFile').textContent='';
+    updateStatus('Select a PDF','info');
+    document.getElementById('extractBtn').disabled=true;
+  }
 });
 
+function updateStatus(msg,type='info'){
+  const s=document.getElementById('status');
+  s.textContent=msg;
+  s.className=`status ${type}`;
+}
+
+function resetUI(){
+  document.getElementById('progressBar').style.width='0%';
+  document.getElementById('progressText').textContent='Ready';
+  document.getElementById('results').style.display='none';
+  document.getElementById('resultsContent').innerHTML='';
+  document.getElementById('downloadTxt').disabled=true;
+  document.getElementById('downloadCsv').disabled=true;
+}
+
+// Extract CNICs
 document.getElementById('extractBtn').addEventListener('click', async ()=>{
-  const file = pdfInput.files[0]; if(!file){ updateStatus('No PDF selected!','error'); return; }
-  resetUI(); document.getElementById('extractBtn').disabled=true; updateStatus('Processing PDF...', 'info'); await extractCNICs(file); document.getElementById('extractBtn').disabled=false;
+  const file=document.getElementById('pdfFile').files[0];
+  if(!file){ updateStatus('No PDF selected','error'); return; }
+  resetUI();
+  document.getElementById('extractBtn').disabled=true;
+  updateStatus('Processing PDF...');
+  await extractCNICs(file);
+  document.getElementById('extractBtn').disabled=false;
 });
 
 async function extractCNICs(file){
-  const pdfData = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data:pdfData}).promise;
-  const cnicRegex=/\b\d{5}-\d{7}-\d\b/g;
+  const pdfData=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:pdfData}).promise;
+  const regex=/\b\d{5}-\d{7}-\d\b/g;
   let resultsByPage={};
 
   for(let i=1;i<=pdf.numPages;i++){
-    updateStatus(`Processing page ${i} of ${pdf.numPages}`,'info');
-    const page = await pdf.getPage(i);
+    updateStatus(`Processing page ${i}/${pdf.numPages}`);
+    const page=await pdf.getPage(i);
 
-    // Try text extraction
-    let textContent = await page.getTextContent();
-    let pageText = textContent.items.map(item=>item.str).join(' ');
-    let matches = pageText.match(cnicRegex)||[];
+    let textItems=await page.getTextContent();
+    let pageText=textItems.items.map(it=>it.str).join(' ');
+    let matches=pageText.match(regex)||[];
 
-    // Fallback OCR
     if(matches.length===0){
       const viewport=page.getViewport({scale:2});
       const canvas=document.createElement('canvas');
@@ -97,60 +113,65 @@ async function extractCNICs(file){
       const ctx=canvas.getContext('2d');
       await page.render({canvasContext:ctx,viewport}).promise;
 
-      const { data:{ text: ocrText } } = await Tesseract.recognize(canvas,'eng',{
-        logger:m=>{ document.getElementById('progressText').textContent=`Page ${i}: OCR ${Math.round(m.progress*100)}%`; }
+      const { data:{text:ocrText} }=await Tesseract.recognize(canvas,'eng',{
+        logger:m=>document.getElementById('progressText').textContent=`Page ${i} OCR ${Math.round(m.progress*100)}%`
       });
-      matches = ocrText.match(cnicRegex)||[];
+      matches=ocrText.match(regex)||[];
     }
 
-    resultsByPage[i] = matches.map(cnic=>({cnic,count:1}));
-    document.getElementById('progressBar').style.width=`${Math.round((i/pdf.numPages)*100)}%`;
+    resultsByPage[i]=matches.map(cnic=>({cnic}));
+    document.getElementById('progressBar').style.width=`${Math.round(i/pdf.numPages*100)}%`;
   }
 
-  let allCnics = [].concat(...Object.values(resultsByPage).map(arr=>arr.map(x=>x.cnic)));
-  let uniqueCnics = [...new Set(allCnics)];
-  currentData = { cnics_by_page: resultsByPage, total_occurrences: allCnics.length, unique_cnics: uniqueCnics.length, total_pages: pdf.numPages };
+  let allCnics=[].concat(...Object.values(resultsByPage).map(arr=>arr.map(x=>x.cnic)));
+  currentData={ cnics_by_page: resultsByPage, total:allCnics.length, unique:[...new Set(allCnics)].length, pages:pdf.numPages };
   showResults(currentData);
-  updateStatus('Extraction completed!', 'success');
+  updateStatus('Extraction completed!','success');
 }
 
+// Display
 function showResults(data){
   document.getElementById('results').style.display='block';
-  const resultsContent=document.getElementById('resultsContent');
+  const container=document.getElementById('resultsContent');
   let html=''; let serial=1;
   for(const page of Object.keys(data.cnics_by_page).map(p=>parseInt(p)).sort((a,b)=>a-b)){
     const cnics=data.cnics_by_page[page]||[];
-    html+=`<div class="page-section"><div class="page-header">📄 Page ${page}</div>`;
-    cnics.forEach(c=>{ html+=`<div class="cnic-item"><strong>${serial++}.</strong> ${c.cnic}</div>`; });
+    html+=`<div class="page-section"><strong>Page ${page}:</strong>`;
+    cnics.forEach(c=>{ html+=`<div class="cnic-item">${serial++}. ${c.cnic}</div>`; });
     html+='</div>';
   }
-  resultsContent.innerHTML=html;
+  container.innerHTML=html;
   document.getElementById('downloadTxt').disabled=false;
   document.getElementById('downloadCsv').disabled=false;
 }
 
+// Downloads
 document.getElementById('downloadTxt').addEventListener('click', ()=>{
   if(!currentData) return;
-  let txt=`CNIC Extraction\nDate: ${new Date().toLocaleString()}\nTotal CNICs: ${currentData.total_occurrences}\nUnique CNICs: ${currentData.unique_cnics}\n\n`;
+  let txt=`Total CNICs: ${currentData.total}\nUnique: ${currentData.unique}\n\n`;
   for(const page of Object.keys(currentData.cnics_by_page).map(p=>parseInt(p)).sort((a,b)=>a-b)){
     const cnics=currentData.cnics_by_page[page]||[];
-    txt+=`Page ${page}:\n`; cnics.forEach(c=>{ txt+=`${c.cnic}\n`; }); txt+='\n';
+    txt+=`Page ${page}:\n`; cnics.forEach(c=>txt+=`${c.cnic}\n`); txt+='\n';
   }
   downloadFile(txt,'cnics.txt','text/plain');
 });
 
 document.getElementById('downloadCsv').addEventListener('click', ()=>{
   if(!currentData) return;
-  let csv='SerialNo,CNIC,Page\n'; let serial=1;
+  let csv='Serial,CNIC,Page\n'; let serial=1;
   for(const page of Object.keys(currentData.cnics_by_page).map(p=>parseInt(p)).sort((a,b)=>a-b)){
     const cnics=currentData.cnics_by_page[page]||[];
-    cnics.forEach(c=>{ csv+=`${serial++},"${c.cnic}",${page}\n`; });
+    cnics.forEach(c=>csv+=`${serial++},${c.cnic},${page}\n`);
   }
   downloadFile(csv,'cnics.csv','text/csv');
 });
 
 function downloadFile(content,filename,type){
-  const blob=new Blob([content],{type}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  const blob=new Blob([content],{type});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
 }
 </script>
 </body>
