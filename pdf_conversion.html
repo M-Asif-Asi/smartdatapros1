@@ -141,9 +141,51 @@ async function extractCNICs(file) {
     const pdf = await pdfjsLib.getDocument({data: pdfData}).promise;
     const cnicRegex = /\b\d{5}-\d{7}-\d\b/g;
     let resultsByPage = {};
-    for(let i=1; i<=pdf.numPages; i++){
+
+    for (let i = 1; i <= pdf.numPages; i++) {
         updateStatus(`Processing page ${i} of ${pdf.numPages}...`, 'info');
+
         const page = await pdf.getPage(i);
+
+        // 1️⃣ Try text-based extraction first
+        let textContent = await page.getTextContent();
+        let pageText = textContent.items.map(item => item.str).join(' ');
+        let matches = pageText.match(cnicRegex) || [];
+
+        // 2️⃣ Fallback to OCR if no CNICs found
+        if (matches.length === 0) {
+            const viewport = page.getViewport({scale: 2});
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext('2d');
+            await page.render({canvasContext: ctx, viewport}).promise;
+
+            const { data: { text: ocrText } } = await Tesseract.recognize(canvas, 'eng', {
+                logger: m => {
+                    document.getElementById('progressText').textContent = `Page ${i}: OCR ${Math.round(m.progress*100)}%`;
+                }
+            });
+            matches = ocrText.match(cnicRegex) || [];
+        }
+
+        resultsByPage[i] = matches.map(cnic => ({ cnic, count: 1 }));
+        document.getElementById('progressBar').style.width = `${Math.round((i/pdf.numPages)*100)}%`;
+    }
+
+    // Aggregate results
+    let allCnics = [].concat(...Object.values(resultsByPage).map(arr => arr.map(x=>x.cnic)));
+    let uniqueCnics = [...new Set(allCnics)];
+    currentData = {
+        cnics_by_page: resultsByPage,
+        total_occurrences: allCnics.length,
+        unique_cnics: uniqueCnics.length,
+        total_pages: pdf.numPages
+    };
+
+    showResults(currentData);
+    updateStatus('Extraction completed!', 'success');
+}
 
         // Render page to canvas
         const viewport = page.getViewport({scale:2});
