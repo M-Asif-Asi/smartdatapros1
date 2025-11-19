@@ -103,19 +103,6 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.469/pdf.min.js"></script>
-<script>
-    // ---------- State ----------
-    let currentData = null;
-
-    // ---------- Sample Data (for demonstration, replace with real extraction logic) ----------
-    const sampleData = {
-        total_occurrences: 6,
-        unique_cnics: 4,
-        cnics_by_page: {
-            1: [{cnic: "12345-6789012-3", count: 2}, {cnic: "98765-4321098-7", count: 1}],
-            2: [{cnic: "11111-2222222-3", count: 1}, {cnic: "12345-6789012-3", count: 1}, {cnic: "55555-6666666-7", count: 1}]
-        }
-    };
 
     // ---------- Helpers ----------
     function updateStatus(message, type) {
