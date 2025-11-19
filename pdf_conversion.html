@@ -127,37 +127,158 @@
         </div>
     </div>
 
-        // ---------- State ----------
-        let currentData = null;
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+      // set worker
+      if (typeof pdfjsLib !== 'undefined') {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+      }
+    </script>
 
-        // ---------- Helpers ----------
-        function updateStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
+    <script>
+    // ------------------- Real CNIC Extractor (hyphenated CNIC only) -------------------
+
+    // Regex for hyphenated CNICs like 42101-1234567-5
+    const CNIC_REGEX_HYPHEN = /\b\d{5}-\d{7}-\d\b/g;
+
+    // State
+    let currentData = null;
+    let isProcessing = false;
+
+    // Helpers
+    function updateStatus(message, type = 'info') {
+        const status = document.getElementById('status');
+        if (!status) return;
+        status.textContent = message;
+        status.className = `status ${type}`;
+    }
+
+    function resetProgressAndResults() {
+        const bar = document.getElementById('progressBar');
+        const text = document.getElementById('progressText');
+        if (bar) bar.style.width = '0%';
+        if (text) text.textContent = 'Ready to process';
+        const stats = document.getElementById('stats');
+        const results = document.getElementById('results');
+        const resultsContent = document.getElementById('resultsContent');
+        if (stats) stats.style.display = 'none';
+        if (results) results.style.display = 'none';
+        if (resultsContent) resultsContent.innerHTML = '';
+        const dlTxt = document.getElementById('downloadTxt');
+        const dlCsv = document.getElementById('downloadCsv');
+        const extractBtn = document.getElementById('extractBtn');
+        if (dlTxt) dlTxt.disabled = true;
+        if (dlCsv) dlCsv.disabled = true;
+        if (extractBtn) extractBtn.disabled = true;
+    }
+
+    // Extract text from a PDF file using pdf.js
+    async function extractTextFromPDF(file) {
+        if (typeof pdfjsLib === 'undefined') {
+            throw new Error('pdfjsLib not found. Make sure PDF.js is loaded.');
         }
 
-        function resetProgressAndResults() {
-            document.getElementById('progressBar').style.width = '0%';
-            document.getElementById('progressText').textContent = 'Ready to process';
-            document.getElementById('stats').style.display = 'none';
-            document.getElementById('results').style.display = 'none';
-            document.getElementById('resultsContent').innerHTML = '';
-            document.getElementById('downloadTxt').disabled = true;
-            document.getElementById('downloadCsv').disabled = true;
-            document.getElementById('extractBtn').disabled = true;
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdf = await loadingTask.promise;
+        const numPages = pdf.numPages;
+        const pages = [];
+
+        for (let p = 1; p <= numPages; p++) {
+            const page = await pdf.getPage(p);
+            const textContent = await page.getTextContent();
+            // join text fragments with spaces
+            const pageText = textContent.items.map(i => i.str).join(' ');
+            pages.push({ page: p, text: pageText });
         }
 
-        // ---------- File input handling ----------
-        const pdfFileInput = document.getElementById('pdfFile');
+        return pages;
+    }
+
+    // Extract CNICs from a text string (hyphenated only)
+    function extractCnicsFromText_Hyphen(text) {
+        if (!text) return [];
+        const matches = [];
+        let m;
+        while ((m = CNIC_REGEX_HYPHEN.exec(text)) !== null) {
+            matches.push(m[0]);
+        }
+        return matches;
+    }
+
+    // Process file, extract CNICs page-by-page
+    async function processFileAndExtract(file) {
+        if (!file) throw new Error('No file provided.');
+        isProcessing = true;
+        updateStatus('Reading PDF and extracting text...', 'info');
+
+        let pages;
+        try {
+            pages = await extractTextFromPDF(file);
+        } catch (err) {
+            isProcessing = false;
+            throw err;
+        }
+
+        updateStatus('Scanning pages for CNIC patterns...', 'info');
+
+        const cnicsByPage = {};            // page -> [ { cnic, count } ]
+        const globalCounter = new Map();   // cnic -> total occurrences
+
+        const totalPages = pages.length;
+
+        for (let i = 0; i < pages.length; i++) {
+            const { page, text } = pages[i];
+            const rawMatches = extractCnicsFromText_Hyphen(text);
+            // count per page
+            const perPage = new Map();
+            rawMatches.forEach(r => {
+                const key = r.trim();
+                perPage.set(key, (perPage.get(key) || 0) + 1);
+                globalCounter.set(key, (globalCounter.get(key) || 0) + 1);
+            });
+
+            const arr = [];
+            for (const [cnic, count] of perPage.entries()) {
+                arr.push({ cnic, count });
+            }
+            cnicsByPage[page] = arr;
+
+            // update progress UI
+            const pct = Math.round(((i + 1) / totalPages) * 100);
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            if (progressBar) progressBar.style.width = `${pct}%`;
+            if (progressText) progressText.textContent = `Processing... ${pct}%`;
+
+            // tiny delay to keep UI responsive
+            await new Promise(r => setTimeout(r, 10));
+        }
+
+        const totalOccurrences = Array.from(globalCounter.values()).reduce((a, b) => a + b, 0);
+        const uniqueCnics = globalCounter.size;
+
+        const data = {
+            total_occurrences: totalOccurrences,
+            unique_cnics: uniqueCnics,
+            total_pages: totalPages,
+            cnics_by_page: cnicsByPage
+        };
+
+        isProcessing = false;
+        return data;
+    }
+
+    // UI wiring
+    const pdfFileInput = document.getElementById('pdfFile');
+    if (pdfFileInput) {
         pdfFileInput.addEventListener('change', function (e) {
             const file = e.target.files[0];
             if (file) {
                 document.getElementById('selectedFile').textContent = `Selected: ${file.name}`;
                 document.getElementById('extractBtn').disabled = false;
-                // Reset any previous results
-                document.getElementById('progressBar').style.width = '0%';
-                document.getElementById('progressText').textContent = 'Ready to process';
+                resetProgressAndResults();
                 updateStatus('File selected. Click "Extract CNICs" to process.', 'info');
             } else {
                 document.getElementById('selectedFile').textContent = '';
@@ -165,184 +286,174 @@
                 document.getElementById('extractBtn').disabled = true;
             }
         });
+    }
 
-        // ---------- Extract button ----------
-        document.getElementById('extractBtn').addEventListener('click', function () {
-            simulateExtraction();
-        });
-
-        function simulateExtraction() {
+    const extractBtn = document.getElementById('extractBtn');
+    if (extractBtn) {
+        extractBtn.addEventListener('click', async function () {
+            if (isProcessing) return;
             const fileInput = document.getElementById('pdfFile');
-            if (!fileInput.files[0]) {
+            if (!fileInput || !fileInput.files[0]) {
                 updateStatus('Please select a PDF file first!', 'error');
                 return;
             }
 
-            // disable buttons while processing
-            document.getElementById('extractBtn').disabled = true;
-            document.getElementById('downloadTxt').disabled = true;
-            document.getElementById('downloadCsv').disabled = true;
-            updateStatus('Processing PDF file...', 'info');
+            try {
+                extractBtn.disabled = true;
+                document.getElementById('downloadTxt').disabled = true;
+                document.getElementById('downloadCsv').disabled = true;
+                updateStatus('Starting extraction...', 'info');
 
-            // simulate progress and then show results
-            simulateProgress();
-        }
+                const file = fileInput.files[0];
+                const data = await processFileAndExtract(file);
 
-        function simulateProgress() {
-            let progress = 0;
-            const progressBar = document.getElementById('progressBar');
-            const progressText = document.getElementById('progressText');
-
-            const interval = setInterval(() => {
-                progress += Math.floor(Math.random() * 8) + 2; // random step to feel realistic
-                if (progress > 100) progress = 100;
-                progressBar.style.width = progress + '%';
-                progressText.textContent = `Processing... ${progress}%`;
-
-                if (progress >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        // show results using sampleData (replace this with real extraction result when available)
-                        showResults(sampleData);
-                        updateStatus('CNIC extraction completed successfully!', 'success');
-                        progressText.textContent = 'Processing complete!';
-                    }, 400);
-                }
-            }, 60);
-        }
-
-        function showResults(data) {
-            currentData = data;
-
-            // Show stats and results sections
-            document.getElementById('stats').style.display = 'grid';
-            document.getElementById('results').style.display = 'block';
-
-            // Update statistics
-            document.getElementById('totalCnics').textContent = data.total_occurrences ?? 0;
-            document.getElementById('uniqueCnics').textContent = data.unique_cnics ?? 0;
-            document.getElementById('totalPages').textContent = data.total_pages ?? Object.keys(data.cnics_by_page).length;
-
-            // Build results HTML; ensure pages processed in numeric order
-            const resultsContent = document.getElementById('resultsContent');
-            let html = '';
-
-            // Convert keys to numbers and sort
-            const pages = Object.keys(data.cnics_by_page || {}).map(p => parseInt(p, 10)).sort((a, b) => a - b);
-
-            // Build cumulative counts for serial calculation
-            const cumulativeCounts = {};
-            let cumulative = 0;
-            for (const p of pages) {
-                cumulativeCounts[p] = cumulative;
-                cumulative += (data.cnics_by_page[p] || []).length;
+                currentData = data;
+                showResults(data);
+                updateStatus('CNIC extraction completed successfully!', 'success');
+                const progressText = document.getElementById('progressText');
+                if (progressText) progressText.textContent = 'Processing complete!';
+            } catch (err) {
+                console.error(err);
+                updateStatus(`Error: ${err.message || err}`, 'error');
+                extractBtn.disabled = false;
             }
-
-            for (const page of pages) {
-                const cnics = data.cnics_by_page[page] || [];
-                html += `<div class="page-section"><div class="page-header">📄 Page ${page}</div>`;
-                cnics.forEach((cnicInfo, index) => {
-                    const serial = cumulativeCounts[page] + index + 1;
-                    html += `<div class="cnic-item"><strong>${serial}.</strong> ${cnicInfo.cnic}`;
-                    if (cnicInfo.count > 1) {
-                        html += ` <small style="color: #e74c3c;"> (appears ${cnicInfo.count} times)</small>`;
-                    }
-                    html += `</div>`;
-                });
-                html += `</div>`;
-            }
-
-            resultsContent.innerHTML = html;
-
-            // Enable download buttons
-            document.getElementById('downloadTxt').disabled = false;
-            document.getElementById('downloadCsv').disabled = false;
-        }
-
-        // ---------- Downloads ----------
-        document.getElementById('downloadTxt').addEventListener('click', downloadTxt);
-        document.getElementById('downloadCsv').addEventListener('click', downloadCsv);
-
-        function downloadTxt() {
-            if (!currentData) {
-                updateStatus('No data to download!', 'error');
-                return;
-            }
-
-            let content = "EXTRACTED CNIC NUMBERS\n";
-            content += "=".repeat(50) + "\n";
-            content += `Extraction Date: ${new Date().toLocaleString()}\n`;
-            content += `Total CNIC Occurrences: ${currentData.total_occurrences}\n`;
-            content += `Unique CNICs: ${currentData.unique_cnics}\n`;
-            content += "=".repeat(50) + "\n\n";
-
-            const pages = Object.keys(currentData.cnics_by_page || {}).map(p => parseInt(p, 10)).sort((a, b) => a - b);
-            for (const page of pages) {
-                const cnics = currentData.cnics_by_page[page] || [];
-                content += `PAGE ${page}:\n`;
-                content += "-".repeat(40) + "\n";
-                cnics.forEach((cnicInfo, index) => {
-                    // calculate serial
-                    const serial = pages.slice(0, pages.indexOf(page)).reduce((acc, p) => acc + (currentData.cnics_by_page[p] || []).length, 0) + index + 1;
-                    if (cnicInfo.count > 1) {
-                        content += `${serial.toString().padStart(3)}. ${cnicInfo.cnic} (appears ${cnicInfo.count} times)\n`;
-                    } else {
-                        content += `${serial.toString().padStart(3)}. ${cnicInfo.cnic}\n`;
-                    }
-                });
-                content += "\n";
-            }
-
-            content += "=".repeat(50) + "\n";
-            content += "Developed by Muhammad Asif\n";
-
-            downloadFile(content, 'cnics.txt', 'text/plain');
-            updateStatus('TXT file downloaded successfully!', 'success');
-        }
-
-        function downloadCsv() {
-            if (!currentData) {
-                updateStatus('No data to download!', 'error');
-                return;
-            }
-
-            let content = "SerialNo,CNICNumber,PageNumber,OccurrenceCount,ExtractionDate\n";
-            let serial = 1;
-
-            const pages = Object.keys(currentData.cnics_by_page || {}).map(p => parseInt(p, 10)).sort((a, b) => a - b);
-            for (const page of pages) {
-                const cnics = currentData.cnics_by_page[page] || [];
-                cnics.forEach(cnicInfo => {
-                    // wrap CNIC in quotes in case of hyphens
-                    content += `${serial},"${cnicInfo.cnic}",${page},${cnicInfo.count},"${new Date().toLocaleString()}"\n`;
-                    serial++;
-                });
-            }
-
-            downloadFile(content, 'cnics.csv', 'text/csv');
-            updateStatus('CSV file downloaded successfully!', 'success');
-        }
-
-        function downloadFile(content, filename, mimeType) {
-            const blob = new Blob([content], { type: mimeType });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        }
-
-        // ---------- Initialization ----------
-        document.addEventListener('DOMContentLoaded', () => {
-            updateStatus('Welcome! Upload a PDF file to extract CNIC numbers.', 'info');
-            // Reset UI (safe start)
-            document.getElementById('downloadTxt').disabled = true;
-            document.getElementById('downloadCsv').disabled = true;
-            document.getElementById('extractBtn').disabled = true;
         });
+    }
+
+    // Render results into UI
+    function showResults(data) {
+        currentData = data;
+
+        const stats = document.getElementById('stats');
+        const results = document.getElementById('results');
+        const totalCnicsEl = document.getElementById('totalCnics');
+        const uniqueCnicsEl = document.getElementById('uniqueCnics');
+        const totalPagesEl = document.getElementById('totalPages');
+        const resultsContent = document.getElementById('resultsContent');
+
+        if (stats) stats.style.display = 'grid';
+        if (results) results.style.display = 'block';
+        if (totalCnicsEl) totalCnicsEl.textContent = data.total_occurrences ?? 0;
+        if (uniqueCnicsEl) uniqueCnicsEl.textContent = data.unique_cnics ?? 0;
+        if (totalPagesEl) totalPagesEl.textContent = data.total_pages ?? 0;
+        if (!resultsContent) return;
+
+        // Sort pages numerically
+        const pages = Object.keys(data.cnics_by_page || {})
+            .map(p => parseInt(p, 10))
+            .sort((a, b) => a - b);
+
+        let html = '';
+        let cumulative = 0;
+        for (const page of pages) {
+            const cnics = data.cnics_by_page[page] || [];
+            html += `<div class="page-section"><div class="page-header">📄 Page ${page}</div>`;
+            cnics.forEach((cnicInfo, idx) => {
+                const serial = cumulative + idx + 1;
+                html += `<div class="cnic-item"><strong>${serial}.</strong> ${cnicInfo.cnic}`;
+                if (cnicInfo.count > 1) {
+                    html += ` <small style="color: #e74c3c;"> (appears ${cnicInfo.count} times)</small>`;
+                }
+                html += `</div>`;
+            });
+            html += `</div>`;
+            cumulative += cnics.length;
+        }
+
+        resultsContent.innerHTML = html;
+
+        // enable downloads
+        const dlTxt = document.getElementById('downloadTxt');
+        const dlCsv = document.getElementById('downloadCsv');
+        if (dlTxt) dlTxt.disabled = false;
+        if (dlCsv) dlCsv.disabled = false;
+    }
+
+    // Download handlers
+    document.getElementById('downloadTxt').addEventListener('click', function () {
+        if (!currentData) {
+            updateStatus('No data to download!', 'error');
+            return;
+        }
+
+        let content = "EXTRACTED CNIC NUMBERS\n";
+        content += "=".repeat(50) + "\n";
+        content += `Extraction Date: ${new Date().toLocaleString()}\n`;
+        content += `Total CNIC Occurrences: ${currentData.total_occurrences}\n`;
+        content += `Unique CNICs: ${currentData.unique_cnics}\n`;
+        content += "=".repeat(50) + "\n\n";
+
+        const pages = Object.keys(currentData.cnics_by_page || {})
+            .map(p => parseInt(p, 10))
+            .sort((a, b) => a - b);
+
+        for (const page of pages) {
+            const cnics = currentData.cnics_by_page[page] || [];
+            content += `PAGE ${page}:\n`;
+            content += "-".repeat(40) + "\n";
+            cnics.forEach((cnicInfo, index) => {
+                const serial = pages.slice(0, pages.indexOf(page)).reduce((acc, p) => acc + (currentData.cnics_by_page[p] || []).length, 0) + index + 1;
+                if (cnicInfo.count > 1) {
+                    content += `${serial.toString().padStart(3)}. ${cnicInfo.cnic} (appears ${cnicInfo.count} times)\n`;
+                } else {
+                    content += `${serial.toString().padStart(3)}. ${cnicInfo.cnic}\n`;
+                }
+            });
+            content += "\n";
+        }
+
+        content += "=".repeat(50) + "\n";
+        content += "Developed by Muhammad Asif\n";
+
+        downloadFile(content, 'cnics.txt', 'text/plain');
+        updateStatus('TXT file downloaded successfully!', 'success');
+    });
+
+    document.getElementById('downloadCsv').addEventListener('click', function () {
+        if (!currentData) {
+            updateStatus('No data to download!', 'error');
+            return;
+        }
+
+        let content = "SerialNo,CNICNumber,PageNumber,OccurrenceCount,ExtractionDate\n";
+        let serial = 1;
+
+        const pages = Object.keys(currentData.cnics_by_page || {})
+            .map(p => parseInt(p, 10))
+            .sort((a, b) => a - b);
+
+        for (const page of pages) {
+            const cnics = currentData.cnics_by_page[page] || [];
+            cnics.forEach(cnicInfo => {
+                // wrap CNIC in quotes in case of hyphens
+                content += `${serial},"${cnicInfo.cnic}",${page},${cnicInfo.count},"${new Date().toLocaleString()}"\n`;
+                serial++;
+            });
+        }
+
+        downloadFile(content, 'cnics.csv', 'text/csv');
+        updateStatus('CSV file downloaded successfully!', 'success');
+    });
+
+    function downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+    }
+
+    // Initialization
+    document.addEventListener('DOMContentLoaded', () => {
+        updateStatus('Welcome! Upload a PDF file to extract CNIC numbers.', 'info');
+        document.getElementById('downloadTxt').disabled = true;
+        document.getElementById('downloadCsv').disabled = true;
+        document.getElementById('extractBtn').disabled = true;
+    });
     </script>
 </body>
 </html>
