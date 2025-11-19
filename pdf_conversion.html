@@ -277,7 +277,7 @@
             const file = e.target.files[0];
             if (file) {
                 document.getElementById('selectedFile').textContent = `Selected: ${file.name}`;
-                document.getElementById('extractBtn').disabled = false;
+                document.getElementById('extractBtn').disabled = true;
                 resetProgressAndResults();
                 updateStatus('File selected. Click "Extract CNICs" to process.', 'info');
             } else {
