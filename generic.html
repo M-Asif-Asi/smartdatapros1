@@ -187,7 +187,13 @@
     </div>
     </div>
     <footer>
-        <p>&copy; 2024 Smart Data Pros | Contact us at masiflail716@gmail.com</p>
+        <p>&copy; <span id="year"></span> Smart Data Pros | Contact us at masiflail716@gmail.com</p>
+
+<script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
     </footer>
 </body>
 </html>
+
